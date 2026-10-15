@@ -7,6 +7,10 @@
   user-select: none;
   touch-action: pinch-zoom;
 
+  &.mud-slider-touch-active > .mud-slider-container > .mud-slider-value-label {
+    opacity: 1;
+  }
+
   & > .mud-typography {
     margin-top: 10px;
   }

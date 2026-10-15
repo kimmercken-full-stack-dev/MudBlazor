@@ -4,6 +4,7 @@ using AngleSharp.Html.Dom;
 using AwesomeAssertions;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using MudBlazor.UnitTests.TestComponents.Slider;
 using NUnit.Framework;
 
@@ -365,6 +366,123 @@ namespace MudBlazor.UnitTests.Components
                 IElement Filling() => comp.Find(".mud-slider-filled");
                 Filling().GetAttribute("style").Should().Be($"width:{expectedPercentage}%;");
             }
+        }
+
+        /// <summary>
+        /// Touching the slider activates its value label until release or cancellation (#11760).
+        /// </summary>
+        [TestCase(false)]
+        [TestCase(true)]
+        public async Task ValueLabel_TouchInteraction(bool cancel)
+        {
+            Context.AddFakeTimeProvider();
+            var comp = Context.Render<MudSlider<int>>(x => x.Add(p => p.ValueLabel, true));
+
+            IElement Input() => comp.Find(".mud-slider-input");
+            IElement Slider() => comp.Find(".mud-slider");
+
+            Slider().ClassList.Should().NotContain("mud-slider-touch-active");
+
+            await Input().TouchStartAsync(new TouchEventArgs());
+
+            Slider().ClassList.Should().Contain("mud-slider-touch-active");
+
+            if (cancel)
+            {
+                await Input().TouchCancelAsync(new TouchEventArgs());
+            }
+            else
+            {
+                await Input().TouchEndAsync(new TouchEventArgs());
+            }
+
+            Slider().ClassList.Should().NotContain("mud-slider-touch-active");
+        }
+
+        /// <summary>
+        /// Touch interaction preserves the value update timing selected by Immediate (#11760).
+        /// </summary>
+        [TestCase(true)]
+        [TestCase(false)]
+        public async Task ValueLabel_TouchPreservesImmediate(bool immediate)
+        {
+            Context.AddFakeTimeProvider();
+            var selectedValue = 25;
+            var comp = Context.Render<MudSlider<int>>(x => x
+                .Add(p => p.Value, 25)
+                .Add(p => p.ValueChanged, (int value) => selectedValue = value)
+                .Add(p => p.ValueLabel, true)
+                .Add(p => p.Immediate, immediate));
+
+            IElement Input() => comp.Find(".mud-slider-input");
+            IElement ValueLabel() => comp.Find(".mud-slider-value-label");
+
+            await Input().TouchStartAsync(new TouchEventArgs());
+
+            selectedValue.Should().Be(25);
+
+            if (immediate)
+            {
+                await Input().InputAsync("65");
+                selectedValue.Should().Be(65);
+                comp.Find(".mud-slider").ClassList.Should().Contain("mud-slider-touch-active");
+            }
+
+            await Input().TouchEndAsync(new TouchEventArgs());
+
+            if (!immediate)
+            {
+                selectedValue.Should().Be(25);
+                await Input().ChangeAsync("65");
+            }
+
+            selectedValue.Should().Be(65);
+            ValueLabel().TextContent.Trim().Should().Be("65");
+            ValueLabel().GetAttribute("style").Should().Be("left:65%;");
+        }
+
+        /// <summary>
+        /// A disabled slider cannot activate its touch value label (#11760).
+        /// </summary>
+        [Test]
+        public async Task ValueLabel_DisabledTouchDoesNotActivate()
+        {
+            Context.AddFakeTimeProvider();
+            var comp = Context.Render<MudSlider<int>>(x => x
+                .Add(p => p.ValueLabel, true)
+                .Add(p => p.Disabled, true));
+
+            IElement Input() => comp.Find(".mud-slider-input");
+            IElement Slider() => comp.Find(".mud-slider");
+
+            await Input().TouchStartAsync(new TouchEventArgs());
+
+            Slider().ClassList.Should().NotContain("mud-slider-touch-active");
+        }
+
+        /// <summary>
+        /// Disabling the slider clears its touch state without a touch-end event (#11760).
+        /// </summary>
+        [Test]
+        public async Task ValueLabel_DisablingDuringTouchClearsActiveState()
+        {
+            Context.AddFakeTimeProvider();
+            var comp = Context.Render<MudSlider<int>>(x => x.Add(p => p.ValueLabel, true));
+
+            IElement Input() => comp.Find(".mud-slider-input");
+            IElement Slider() => comp.Find(".mud-slider");
+
+            await Input().TouchStartAsync(new TouchEventArgs());
+
+            Slider().ClassList.Should().Contain("mud-slider-touch-active");
+
+            await comp.SetParametersAndRenderAsync(parameters => parameters.Add(p => p.Disabled, true));
+
+            Slider().ClassList.Should().NotContain("mud-slider-touch-active");
+
+            await comp.SetParametersAndRenderAsync(parameters => parameters.Add(p => p.Disabled, false));
+
+            Slider().ClassList.Should().NotContain("mud-slider-touch-active");
         }
 
         [Test]

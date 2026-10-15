@@ -14,6 +14,7 @@ namespace MudBlazor
     {
         private int _tickMarkCount = 0;
         private bool _nullableValueResetToDefault = false;
+        private bool _isTouching;
         private readonly ParameterState<T> _valueState;
         private readonly ParameterState<T?> _nullableValueState;
 
@@ -35,6 +36,7 @@ namespace MudBlazor
                 .AddClass($"mud-slider-{Size.ToStringFast(true)}")
                 .AddClass($"mud-slider-{Color.ToStringFast(true)}")
                 .AddClass("mud-slider-vertical", Vertical)
+                .AddClass("mud-slider-touch-active", _isTouching && ValueLabel && !Disabled)
                 .AddClass(Class)
                 .Build();
 
@@ -197,6 +199,7 @@ namespace MudBlazor
         /// </summary>
         /// <remarks>
         /// Defaults to <c>false</c>.
+        /// The label is shown while dragging the thumb with a mouse or touch.
         /// </remarks>
         [Parameter]
         [Category(CategoryTypes.Button.Appearance)]
@@ -238,6 +241,11 @@ namespace MudBlazor
         /// <inheritdoc />
         protected override void OnParametersSet()
         {
+            if (Disabled)
+            {
+                _isTouching = false;
+            }
+
             if (TickMarks)
             {
                 var min = Convert.ToDecimal(Min);
@@ -262,6 +270,10 @@ namespace MudBlazor
         }
 
         private string GetValueText => _valueState.Value.ToString(null, CultureInfo.InvariantCulture);
+
+        private void OnTouchStart() => _isTouching = !Disabled;
+
+        private void OnTouchEnd() => _isTouching = false;
 
         private async Task SetValueTextAsync(string? text)
         {
