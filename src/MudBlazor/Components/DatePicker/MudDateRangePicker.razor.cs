@@ -34,6 +34,26 @@ namespace MudBlazor
         }
 
         /// <summary>
+        /// The first date of the pending calendar selection.
+        /// </summary>
+        /// <remarks>
+        /// Has a value while the user is selecting an end date, before <see cref="DateRange"/> is updated.
+        /// Once both dates are selected, this is the earlier date.
+        /// Cleared when the selection is submitted, cleared, or the picker is closed.
+        /// </remarks>
+        protected DateTime? FirstDate => _firstDate;
+
+        /// <summary>
+        /// The second date of the pending calendar selection.
+        /// </summary>
+        /// <remarks>
+        /// Is <c>null</c> while the user is selecting an end date.
+        /// Once both dates are selected, this is the later date.
+        /// Cleared when the selection is submitted, cleared, or a new selection starts.
+        /// </remarks>
+        protected DateTime? SecondDate => _secondDate;
+
+        /// <summary>
         /// The maximum number of selectable days.
         /// </summary>
         /// <remarks>

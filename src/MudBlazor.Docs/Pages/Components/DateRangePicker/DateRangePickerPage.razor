@@ -55,5 +55,16 @@
                 <DateRangePickerActionButtonsExample />
             </SectionContent>
         </DocsPageSection>
+
+        <DocsPageSection>
+            <SectionHeader Title="Custom Date Restrictions">
+                <Description>
+                    In a component derived from <CodeInline>MudDateRangePicker</CodeInline>, override <CodeInline>IsDayDisabled</CodeInline> to customize which dates can be selected.
+                    The protected read-only properties <CodeInline>FirstDate</CodeInline> and <CodeInline>SecondDate</CodeInline> expose the pending calendar selection before <CodeInline>DateRange</CodeInline> is updated.
+                    While selecting an end date, <CodeInline>FirstDate</CodeInline> has a value and <CodeInline>SecondDate</CodeInline> is <CodeInline>null</CodeInline>.
+                    Call <CodeInline>base.IsDayDisabled(date)</CodeInline> in the override to preserve the existing date restrictions.
+                </Description>
+            </SectionHeader>
+        </DocsPageSection>
     </DocsPageContent>
 </DocsPage>

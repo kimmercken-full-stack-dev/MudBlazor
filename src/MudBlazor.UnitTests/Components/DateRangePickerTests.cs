@@ -1916,8 +1916,98 @@ namespace MudBlazor.UnitTests.Components
             comp.Find(".mud-button-month").TextContent.Trim().Should().Be(expectedMonthName);
         }
 
+        /// <summary>
+        /// Derived pickers can inspect pending dates throughout selection, submission, and clearing for issue #13927.
+        /// </summary>
+        [TestCase(2)]
+        [TestCase(-2)]
+        public async Task DateRangePicker_PendingSelectionIsAvailableToDerivedComponents(int endOffset)
+        {
+            Context.AddFakeTimeProvider();
+            var start = new DateTime(2026, 1, 10);
+            var end = start.AddDays(endOffset);
+            var comp = Context.Render<DateRangePickerImpl>(parameters => parameters
+                .Add(p => p.PickerVariant, PickerVariant.Static)
+                .Add(p => p.StartMonth, new DateTime(2026, 1, 1))
+                .Add(p => p.Culture, CultureInfo.InvariantCulture)
+                .Add(p => p.PickerActions, (RenderFragment<MudPicker<DateTime?>>)(_ => builder => { })));
+
+            comp.Instance.PendingSelection().Should().Be(((DateTime?)null, (DateTime?)null));
+
+            await comp.InvokeAsync(() => comp.Instance.ClickDayAsync(start));
+
+            comp.Instance.PendingSelection().Should().Be(((DateTime?)start, (DateTime?)null));
+            comp.Instance.DateRange.Should().BeNull();
+
+            await comp.InvokeAsync(() => comp.Instance.ClickDayAsync(end));
+
+            var expectedStart = endOffset < 0 ? end : start;
+            var expectedEnd = endOffset < 0 ? start : end;
+            comp.Instance.PendingSelection().Should().Be(((DateTime?)expectedStart, (DateTime?)expectedEnd));
+
+            await comp.InvokeAsync(() => comp.Instance.Submit());
+
+            comp.Instance.DateRange.Start.Should().Be(expectedStart);
+            comp.Instance.DateRange.End.Should().Be(expectedEnd);
+            comp.Instance.PendingSelection().Should().Be(((DateTime?)null, (DateTime?)null));
+
+            await comp.InvokeAsync(() => comp.Instance.ClickDayAsync(start));
+
+            comp.Instance.PendingSelection().Should().Be(((DateTime?)start, (DateTime?)null));
+
+            await comp.InvokeAsync(() => comp.Instance.ClearAsync(close: false));
+
+            comp.Instance.DateRange.Should().BeNull();
+            comp.Instance.PendingSelection().Should().Be(((DateTime?)null, (DateTime?)null));
+        }
+
+        /// <summary>
+        /// An IsDayDisabled override can restrict end dates using pending selection while preserving base restrictions for issue #13927.
+        /// </summary>
+        [Test]
+        public async Task DateRangePicker_DerivedDisabledDaysUsesPendingSelection()
+        {
+            Context.AddFakeTimeProvider();
+            var start = new DateTime(2026, 1, 10);
+            var comp = Context.Render<DateRangePickerCustomDisabledDays>(parameters => parameters
+                .Add(p => p.PickerVariant, PickerVariant.Static)
+                .Add(p => p.StartMonth, new DateTime(2026, 1, 1))
+                .Add(p => p.Culture, CultureInfo.InvariantCulture)
+                .Add(p => p.MinDate, new DateTime(2026, 1, 1))
+                .Add(p => p.MaxDate, new DateTime(2026, 6, 30))
+                .Add(p => p.PickerActions, (RenderFragment<MudPicker<DateTime?>>)(_ => builder => { })));
+
+            comp.Instance.DayDisabled(start.AddDays(7)).Should().BeFalse();
+
+            await comp.InvokeAsync(() => comp.Instance.ClickDayAsync(start));
+
+            comp.Instance.DayDisabled(start.AddDays(6)).Should().BeFalse();
+            comp.Instance.DayDisabled(start.AddDays(7)).Should().BeTrue();
+            comp.Instance.DayDisabled(new DateTime(2025, 12, 31)).Should().BeTrue();
+
+            await comp.InvokeAsync(() => comp.Instance.ClickDayAsync(start.AddDays(6)));
+
+            comp.Instance.DayDisabled(start.AddDays(7)).Should().BeFalse();
+            comp.Instance.DayDisabled(new DateTime(2026, 7, 1)).Should().BeTrue();
+        }
+
+        private sealed class DateRangePickerCustomDisabledDays : MudDateRangePicker
+        {
+            public Task ClickDayAsync(DateTime date) => OnDayClickedAsync(date);
+
+            public bool DayDisabled(DateTime date) => IsDayDisabled(date);
+
+            protected override bool IsDayDisabled(DateTime date)
+            {
+                return base.IsDayDisabled(date)
+                    || (FirstDate is { } firstDate && SecondDate is null && date.Date > firstDate.Date.AddDays(6));
+            }
+        }
+
         private sealed class DateRangePickerImpl : MudDateRangePicker
         {
+            public (DateTime? First, DateTime? Second) PendingSelection() => (FirstDate, SecondDate);
+
             public DateTime StartOfMonth() => GetCalendarStartOfMonth();
 
             public Task ClickDayAsync(DateTime date) => OnDayClickedAsync(date);
